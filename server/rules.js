@@ -1,6 +1,12 @@
 const crypto = require('crypto');
 const { load, save, LEVELS, STATUSES, FILE_TYPES, MAX_CODE_LENGTH, MAX_RULE_NAME_LENGTH, MAX_PATTERN_LENGTH, MAX_NOTE_LENGTH } = require('./store');
 const { ApiError, pickText } = require('./errors');
+const {
+  requireOperator,
+  makePermission,
+  assertRuleWritable,
+  assertSetWritableForCreate,
+} = require('./ruleSets');
 
 // 规则编码固定成大写字母加分段的数字，方便在命中清单里引用
 const CODE_PATTERN = /^[A-Z]{2,6}-\d{2,4}$/;
@@ -80,14 +86,19 @@ function sortRules(list) {
   });
 }
 
-// 规则清单：按级别、状态、适用文件类型筛选，再按编码、名称或匹配写法搜索
+// 规则清单：按级别、状态、适用文件类型筛选，再按编码、名称或匹配写法搜索；
+// 带上 operator 时给每条规则标出当前操作者能不能改，别人管的与无归属的照常列出但只读
 function listRules(options) {
   const input = options && typeof options === 'object' ? options : {};
   const level = pickText(input.level);
   const status = pickText(input.status);
   const fileType = pickText(input.fileType);
   const keyword = pickText(input.keyword).toLowerCase();
+  const operator = pickText(input.operator);
   const data = load();
+
+  const setMap = new Map(data.ruleSets.map((item) => [item.id, item]));
+  const permission = operator ? makePermission(data, operator) : null;
 
   let list = data.rules;
   if (level) list = list.filter((item) => item.level === level);
@@ -99,29 +110,58 @@ function listRules(options) {
       || item.pattern.toLowerCase().includes(keyword));
   }
 
+  const withScope = (rule) => {
+    const ruleSet = rule.ruleSetId ? setMap.get(rule.ruleSetId) : null;
+    return {
+      ...rule,
+      ruleSetName: ruleSet ? ruleSet.name : '',
+      owners: ruleSet ? ruleSet.owners.slice() : [],
+      editable: permission ? permission.canEdit(rule) : false,
+    };
+  };
+
+  const sorted = sortRules(list).map(withScope);
+  const editableCount = permission ? sorted.filter((item) => item.editable).length : 0;
   const usedFileTypes = Array.from(new Set(data.rules.map((item) => item.fileType)));
   return {
-    rules: sortRules(list),
+    rules: sorted,
     levels: LEVELS.slice(),
     statuses: STATUSES.slice(),
     fileTypes: FILE_TYPES.slice(),
     usedFileTypes,
+    operator,
+    editableCount,
+    readonlyCount: sorted.length - editableCount,
   };
 }
 
-function getRule(id) {
+function getRule(id, operator) {
   const data = load();
   const found = data.rules.find((item) => item.id === id);
   if (!found) throw new ApiError(404, 'RULE_NOT_FOUND', '这条规则不存在或已被删除', '');
-  return found;
+  const ruleSet = found.ruleSetId ? data.ruleSets.find((item) => item.id === found.ruleSetId) : null;
+  const viewer = pickText(operator);
+  const editable = Boolean(ruleSet && viewer && ruleSet.owners.includes(viewer));
+  return {
+    ...found,
+    ruleSetName: ruleSet ? ruleSet.name : '',
+    owners: ruleSet ? ruleSet.owners.slice() : [],
+    editable,
+  };
 }
 
-function createRule(payload) {
+function createRule(payload, operator) {
+  // 先验身份与归属范围，任何一项不过都在落盘之前拦下
+  const actor = requireOperator(operator);
   const input = payload && typeof payload === 'object' ? payload : {};
   const data = load();
+  const ruleSetId = pickText(input.ruleSetId);
+  assertSetWritableForCreate(data, actor, ruleSetId);
+
   const now = new Date().toISOString();
   const created = {
     id: crypto.randomUUID(),
+    ruleSetId,
     code: validateCode(input.code, data, ''),
     name: validateName(input.name),
     level: validateLevel(input.level),
@@ -137,11 +177,18 @@ function createRule(payload) {
   return created;
 }
 
-function updateRule(id, payload) {
+function updateRule(id, payload, operator) {
+  const actor = requireOperator(operator);
   const input = payload && typeof payload === 'object' ? payload : {};
   const data = load();
   const found = data.rules.find((item) => item.id === id);
   if (!found) throw new ApiError(404, 'RULE_NOT_FOUND', '这条规则不存在或已被删除', '');
+  // 越权在这里当场拦下：还没改任何字段，更不会落盘
+  assertRuleWritable(data, actor, found);
+  // 归属不允许通过编辑挪到别的规则集，避免借编辑把别人的规则换个归属
+  if (input.ruleSetId !== undefined && pickText(input.ruleSetId) !== found.ruleSetId) {
+    throw new ApiError(403, 'RULE_SET_LOCKED', '规则的归属规则集不能通过编辑修改', 'ruleSetId');
+  }
 
   found.code = input.code === undefined ? found.code : validateCode(input.code, data, found.id);
   found.name = input.name === undefined ? found.name : validateName(input.name);
@@ -155,10 +202,12 @@ function updateRule(id, payload) {
   return found;
 }
 
-function deleteRule(id) {
+function deleteRule(id, operator) {
+  const actor = requireOperator(operator);
   const data = load();
   const index = data.rules.findIndex((item) => item.id === id);
   if (index === -1) throw new ApiError(404, 'RULE_NOT_FOUND', '这条规则不存在或已被删除', '');
+  assertRuleWritable(data, actor, data.rules[index]);
   const [removed] = data.rules.splice(index, 1);
   save(data);
   return { id: removed.id, code: removed.code, name: removed.name };

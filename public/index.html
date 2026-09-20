@@ -13,8 +13,10 @@
       <p class="subtitle">维护检查规则与纳入检查的文件，按规则扫一遍，把命中记到具体的文件与行上</p>
     </div>
     <div class="topbar-right">
-      <label class="operator" data-field="operator">当前操作者
-        <input id="operator" placeholder="填上你的名字" maxlength="40">
+      <label class="operator" data-field="operator">当前是谁在看
+        <select id="operator">
+          <option value="">请选择…</option>
+        </select>
       </label>
       <div class="health" id="health">连接中…</div>
     </div>
@@ -37,6 +39,7 @@
           <button type="button" id="rule-new">新建规则</button>
         </div>
       </div>
+      <p class="scope-line" id="rule-scope">右上角先选当前是谁在看，规则区会标出哪些能改、哪些只读</p>
       <div class="table-wrap">
         <table class="grid">
           <thead>
@@ -47,6 +50,9 @@
               <th>状态</th>
               <th>适用文件类型</th>
               <th>匹配写法</th>
+              <th>归属规则集</th>
+              <th>负责人</th>
+              <th>权限</th>
               <th>说明</th>
               <th>更新时间</th>
               <th>操作</th>
@@ -60,6 +66,7 @@
       <form class="entry-form hidden" id="rule-form" autocomplete="off">
         <h3 id="rule-form-title">新建规则</h3>
         <div class="form-row">
+          <label data-field="ruleSetId">归属规则集<select id="rule-set"></select></label>
           <label data-field="code">规则编码<input id="rule-code" placeholder="例如 CODE-013" maxlength="20"></label>
           <label data-field="name">规则名称<input id="rule-name" placeholder="例如 禁止把地址写死在代码里" maxlength="40"></label>
           <label data-field="level">级别

@@ -13,18 +13,24 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, port: PORT });
 });
 
+// 规则集与负责人名单：页面顶栏的选人下拉、规则区的归属列都从这里取
+app.get('/api/rule-sets', (_req, res) => {
+  res.json(api.listRuleSets());
+});
+
 app.get('/api/rules', (req, res) => {
   res.json(api.listRules({
     level: api.readQuery(req.query, 'level'),
     status: api.readQuery(req.query, 'status'),
     fileType: api.readQuery(req.query, 'fileType'),
     keyword: api.readQuery(req.query, 'keyword'),
+    operator: api.readOperator(req),
   }));
 });
 
 app.post('/api/rules', (req, res) => {
   try {
-    res.status(201).json(api.createRule(req.body));
+    res.status(201).json(api.createRule(req.body, api.readOperator(req)));
   } catch (err) {
     sendError(res, err);
   }
@@ -32,7 +38,7 @@ app.post('/api/rules', (req, res) => {
 
 app.get('/api/rules/:id', (req, res) => {
   try {
-    res.json(api.getRule(req.params.id));
+    res.json(api.getRule(req.params.id, api.readOperator(req)));
   } catch (err) {
     sendError(res, err);
   }
@@ -40,7 +46,7 @@ app.get('/api/rules/:id', (req, res) => {
 
 app.patch('/api/rules/:id', (req, res) => {
   try {
-    res.json(api.updateRule(req.params.id, req.body));
+    res.json(api.updateRule(req.params.id, req.body, api.readOperator(req)));
   } catch (err) {
     sendError(res, err);
   }
@@ -48,7 +54,7 @@ app.patch('/api/rules/:id', (req, res) => {
 
 app.delete('/api/rules/:id', (req, res) => {
   try {
-    res.json(api.deleteRule(req.params.id));
+    res.json(api.deleteRule(req.params.id, api.readOperator(req)));
   } catch (err) {
     sendError(res, err);
   }
