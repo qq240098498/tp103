@@ -15,23 +15,35 @@ const MAX_NOTE_LENGTH = 200;
 const MAX_PATH_LENGTH = 120;
 const MAX_CONTENT_LENGTH = 4000;
 
+// 规则集的初始数据。一个规则集归属到一个人或一组人，规则挂在规则集上，
+// 只有负责人能改自己集里的规则；没归入任何规则集的规则谁都改不了，只能看。
+// 林岚与赵铭各自同时管两个规则集，用来观察一个人管多片时两边都能改
+function seedRuleSets() {
+  return [
+    { id: 'set-3001', name: '前端代码规范', owners: ['林岚', '周航'], note: '页面与前端脚本的写法' },
+    { id: 'set-3002', name: '服务端与数据', owners: ['赵铭'], note: '接口、配置与数据库相关' },
+    { id: 'set-3003', name: '脚本与文档', owners: ['林岚', '赵铭'], note: '部署脚本与文档占位' },
+  ];
+}
+
 // 检查规则的初始数据。十二条规则里有两条是停用的，
-// 有一条启用的规则在现有文件里一条命中都没有，用来观察从未命中的规则
+// 有一条启用的规则在现有文件里一条命中都没有，用来观察从未命中的规则；
+// CODE-003 与 CODE-010 没有归入任何规则集，用来观察谁都改不了、只能看的规则
 function seedRules() {
   const at = '2026-09-02T02:00:00.000Z';
   return [
-    { id: 'rule-1001', code: 'CODE-001', name: '禁止提交调试输出', level: '警告', status: '启用', fileType: 'js', pattern: 'console.log', note: '上线前要换成统一日志', createdAt: at, updatedAt: at },
-    { id: 'rule-1002', code: 'CODE-002', name: '变量声明统一用 let 或 const', level: '错误', status: '启用', fileType: 'js', pattern: 'var ', note: '老代码里还有不少', createdAt: at, updatedAt: at },
-    { id: 'rule-1003', code: 'CODE-003', name: '待办事项需要收口', level: '提示', status: '启用', fileType: '全部', pattern: 'TODO', note: '带人名与期限的可以留', createdAt: at, updatedAt: at },
-    { id: 'rule-1004', code: 'CODE-004', name: '禁止动态执行代码', level: '错误', status: '启用', fileType: '全部', pattern: 'eval(', note: '', createdAt: at, updatedAt: at },
-    { id: 'rule-1005', code: 'CODE-005', name: '禁止把口令写进代码', level: '错误', status: '启用', fileType: '全部', pattern: 'password =', note: '口令一律走统一配置', createdAt: at, updatedAt: at },
-    { id: 'rule-1006', code: 'CODE-006', name: '空捕获块要写清原因', level: '警告', status: '启用', fileType: 'js', pattern: 'catch (e) {}', note: '', createdAt: at, updatedAt: at },
-    { id: 'rule-1007', code: 'CODE-007', name: '调试开关上线前要关掉', level: '警告', status: '停用', fileType: 'js', pattern: 'DEBUG = true', note: '等联调结束再打开', createdAt: at, updatedAt: at },
-    { id: 'rule-1008', code: 'CODE-008', name: '数据库地址不许写死在代码里', level: '错误', status: '启用', fileType: '全部', pattern: 'postgres://', note: '', createdAt: at, updatedAt: at },
-    { id: 'rule-1009', code: 'CODE-009', name: '取配置项要走统一封装', level: '提示', status: '启用', fileType: 'js', pattern: 'process.env[', note: '直接按名字取容易拼错', createdAt: at, updatedAt: at },
-    { id: 'rule-1010', code: 'CODE-010', name: '遗留注释要清理', level: '提示', status: '停用', fileType: '全部', pattern: 'FIXME', note: '', createdAt: at, updatedAt: at },
-    { id: 'rule-1011', code: 'CODE-011', name: '脚本里禁止直接用强制删除', level: '警告', status: '启用', fileType: 'sh', pattern: 'rm -rf', note: '脚本里改用受控的清理命令', createdAt: at, updatedAt: at },
-    { id: 'rule-1012', code: 'CODE-012', name: '文档里的临时占位要删掉', level: '提示', status: '启用', fileType: 'md', pattern: '待补', note: '', createdAt: at, updatedAt: at },
+    { id: 'rule-1001', code: 'CODE-001', name: '禁止提交调试输出', level: '警告', status: '启用', fileType: 'js', pattern: 'console.log', note: '上线前要换成统一日志', setId: 'set-3001', createdAt: at, updatedAt: at },
+    { id: 'rule-1002', code: 'CODE-002', name: '变量声明统一用 let 或 const', level: '错误', status: '启用', fileType: 'js', pattern: 'var ', note: '老代码里还有不少', setId: 'set-3001', createdAt: at, updatedAt: at },
+    { id: 'rule-1003', code: 'CODE-003', name: '待办事项需要收口', level: '提示', status: '启用', fileType: '全部', pattern: 'TODO', note: '带人名与期限的可以留', setId: '', createdAt: at, updatedAt: at },
+    { id: 'rule-1004', code: 'CODE-004', name: '禁止动态执行代码', level: '错误', status: '启用', fileType: '全部', pattern: 'eval(', note: '', setId: 'set-3002', createdAt: at, updatedAt: at },
+    { id: 'rule-1005', code: 'CODE-005', name: '禁止把口令写进代码', level: '错误', status: '启用', fileType: '全部', pattern: 'password =', note: '口令一律走统一配置', setId: 'set-3002', createdAt: at, updatedAt: at },
+    { id: 'rule-1006', code: 'CODE-006', name: '空捕获块要写清原因', level: '警告', status: '启用', fileType: 'js', pattern: 'catch (e) {}', note: '', setId: 'set-3001', createdAt: at, updatedAt: at },
+    { id: 'rule-1007', code: 'CODE-007', name: '调试开关上线前要关掉', level: '警告', status: '停用', fileType: 'js', pattern: 'DEBUG = true', note: '等联调结束再打开', setId: 'set-3001', createdAt: at, updatedAt: at },
+    { id: 'rule-1008', code: 'CODE-008', name: '数据库地址不许写死在代码里', level: '错误', status: '启用', fileType: '全部', pattern: 'postgres://', note: '', setId: 'set-3002', createdAt: at, updatedAt: at },
+    { id: 'rule-1009', code: 'CODE-009', name: '取配置项要走统一封装', level: '提示', status: '启用', fileType: 'js', pattern: 'process.env[', note: '直接按名字取容易拼错', setId: 'set-3001', createdAt: at, updatedAt: at },
+    { id: 'rule-1010', code: 'CODE-010', name: '遗留注释要清理', level: '提示', status: '停用', fileType: '全部', pattern: 'FIXME', note: '', setId: '', createdAt: at, updatedAt: at },
+    { id: 'rule-1011', code: 'CODE-011', name: '脚本里禁止直接用强制删除', level: '警告', status: '启用', fileType: 'sh', pattern: 'rm -rf', note: '脚本里改用受控的清理命令', setId: 'set-3003', createdAt: at, updatedAt: at },
+    { id: 'rule-1012', code: 'CODE-012', name: '文档里的临时占位要删掉', level: '提示', status: '启用', fileType: 'md', pattern: '待补', note: '', setId: 'set-3003', createdAt: at, updatedAt: at },
   ];
 }
 
@@ -295,6 +307,26 @@ function seedFiles() {
   ];
 }
 
+// 把单个规则集整理成固定结构，负责人名单去掉空名字与重复名字
+function normalizeRuleSet(item, fallbackIndex) {
+  const source = item && typeof item === 'object' ? item : {};
+  const rawOwners = Array.isArray(source.owners) ? source.owners : [];
+  const seenOwners = new Set();
+  const owners = [];
+  rawOwners.forEach((owner) => {
+    const name = typeof owner === 'string' ? owner.trim() : '';
+    if (!name || seenOwners.has(name)) return;
+    seenOwners.add(name);
+    owners.push(name);
+  });
+  return {
+    id: typeof source.id === 'string' && source.id ? source.id : `set-restored-${fallbackIndex + 1}`,
+    name: typeof source.name === 'string' ? source.name.trim() : '',
+    owners,
+    note: typeof source.note === 'string' ? source.note : '',
+  };
+}
+
 // 把单条规则整理成固定结构，级别与状态不认识的一律回到默认值
 function normalizeRule(item, fallbackIndex) {
   const source = item && typeof item === 'object' ? item : {};
@@ -311,6 +343,7 @@ function normalizeRule(item, fallbackIndex) {
     fileType,
     pattern: typeof source.pattern === 'string' ? source.pattern : '',
     note: typeof source.note === 'string' ? source.note : '',
+    setId: typeof source.setId === 'string' ? source.setId.trim() : '',
     createdAt,
     updatedAt: typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : createdAt,
   };
@@ -335,10 +368,26 @@ function normalizeFile(item, fallbackIndex) {
   };
 }
 
-// 整份数据保证规则与文件结构一致，缺编号、缺名称、缺路径的条目一律丢掉
+// 整份数据保证规则集、规则与文件结构一致，缺编号、缺名称、缺路径的条目一律丢掉；
+// 规则指向的规则集不存在时按未归入处理，未归入的规则谁都改不了、只能看
 function normalize(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
-  const seed = { rules: seedRules(), files: seedFiles() };
+  const seed = { ruleSets: seedRuleSets(), rules: seedRules(), files: seedFiles() };
+
+  const hasRuleSets = Array.isArray(source.ruleSets);
+  const rawRuleSets = hasRuleSets ? source.ruleSets : seed.ruleSets;
+  const seenSetIds = new Set();
+  const ruleSets = [];
+  rawRuleSets.forEach((item, index) => {
+    const set = normalizeRuleSet(item, index);
+    if (!set.id || !set.name) return;
+    if (seenSetIds.has(set.id)) return;
+    seenSetIds.add(set.id);
+    ruleSets.push(set);
+  });
+
+  // 老数据里没有规则集一说：按初始数据的归属把认得的规则挂回各自的集
+  const seedSetIdByRuleId = new Map(seed.rules.map((item) => [item.id, item.setId]));
 
   const rawRules = Array.isArray(source.rules) ? source.rules : seed.rules;
   const seenRuleIds = new Set();
@@ -351,6 +400,10 @@ function normalize(raw) {
     if (seenRuleIds.has(rule.id) || seenCodes.has(lower)) return;
     seenRuleIds.add(rule.id);
     seenCodes.add(lower);
+    if (!rule.setId && !hasRuleSets && seedSetIdByRuleId.has(rule.id)) {
+      rule.setId = seedSetIdByRuleId.get(rule.id);
+    }
+    if (!seenSetIds.has(rule.setId)) rule.setId = '';
     rules.push(rule);
   });
 
@@ -368,7 +421,7 @@ function normalize(raw) {
     files.push(file);
   });
 
-  return { rules, files };
+  return { ruleSets, rules, files };
 }
 
 // 读取数据文件：文件缺失或内容损坏时回落到初始数据并立刻补写
@@ -377,7 +430,7 @@ function load() {
     const raw = fs.readFileSync(DATA_FILE, 'utf8');
     return normalize(JSON.parse(raw));
   } catch (err) {
-    const data = { rules: seedRules(), files: seedFiles() };
+    const data = { ruleSets: seedRuleSets(), rules: seedRules(), files: seedFiles() };
     save(data);
     return data;
   }
@@ -394,9 +447,11 @@ function save(data) {
 module.exports = {
   load,
   save,
+  seedRuleSets,
   seedRules,
   seedFiles,
   normalize,
+  normalizeRuleSet,
   normalizeRule,
   normalizeFile,
   LEVELS,

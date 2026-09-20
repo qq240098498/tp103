@@ -3,6 +3,8 @@
 const state = {
   rules: [],
   files: [],
+  ruleSets: [],
+  operators: [],
   levels: [],
   statuses: [],
   fileTypes: [],
@@ -90,12 +92,26 @@ function levelClass(level) {
 
 const OPERATOR_KEY = 'check-hits-operator';
 
+// 页面打开时先把上次选的人记住，等操作者名单拉回来再回填到下拉里
+let pendingOperator = window.localStorage.getItem(OPERATOR_KEY) || '';
+
 function currentOperator() {
   return el('operator').value.trim();
 }
 
-function restoreOperator() {
-  el('operator').value = window.localStorage.getItem(OPERATOR_KEY) || '';
+// 当前是谁决定每条规则能不能改：只有规则集负责人名单里的人能改自己集里的规则
+function canEditRule(rule) {
+  const operator = currentOperator();
+  return !!operator && Array.isArray(rule.owners) && rule.owners.includes(operator);
+}
+
+function renderOperatorOptions() {
+  const select = el('operator');
+  const wanted = select.value || pendingOperator;
+  select.innerHTML = '<option value="">（选一下你是谁）</option>'
+    + state.operators.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  select.value = state.operators.includes(wanted) ? wanted : '';
+  pendingOperator = select.value;
 }
 
 async function loadHealth() {
@@ -122,9 +138,12 @@ async function loadRules() {
   const query = params.toString();
   const payload = await request(`/api/rules${query ? `?${query}` : ''}`);
   state.rules = payload.rules || [];
+  state.ruleSets = payload.ruleSets || [];
+  state.operators = payload.operators || [];
   state.levels = payload.levels || [];
   state.statuses = payload.statuses || [];
   state.fileTypes = payload.fileTypes || [];
+  renderOperatorOptions();
   renderRuleFilters();
   renderRules();
   renderScanRuleOptions();
@@ -210,23 +229,60 @@ function renderScanFileOptions() {
   if (state.files.some((item) => item.id === current)) select.value = current;
 }
 
+// 规则区上面那行条数：跟着当前是谁与筛选条件走，切人、筛选、刷新后立刻对得上
+function renderRuleScope() {
+  const total = state.rules.length;
+  const operator = currentOperator();
+  const editable = operator ? state.rules.filter((item) => canEditRule(item)).length : 0;
+  const readonly = total - editable;
+  const box = el('rule-scope');
+  if (!operator) {
+    box.textContent = total
+      ? `列表里共 ${total} 条，全部只读：先在右上角选一下你是谁，你负责的规则集才会放开可改`
+      : '';
+    return;
+  }
+  box.textContent = `当前是 ${operator}：列表里共 ${total} 条，可改 ${editable} 条，只读 ${readonly} 条`;
+}
+
 function renderRules() {
   const body = el('rule-body');
-  body.innerHTML = state.rules.map((item) => `<tr>
+  body.innerHTML = state.rules.map((item) => {
+    const editable = canEditRule(item);
+    const setCell = item.setName
+      ? `${escapeHtml(item.setName)}<span class="set-owners">负责人：${escapeHtml(item.owners.join('、') || '暂无')}</span>`
+      : '<span class="set-none">未归入规则集</span>';
+    const readonlyWhy = item.setName
+      ? `归规则集「${item.setName}」管，负责人是 ${item.owners.join('、') || '暂无'}`
+      : '没有归入任何规则集，谁都改不了';
+    const actions = editable
+      ? `<button type="button" class="link" data-rule-edit="${escapeHtml(item.id)}">编辑</button>
+        <button type="button" class="link danger" data-rule-delete="${escapeHtml(item.id)}">删除</button>`
+      : `<span class="tag readonly" title="${escapeHtml(readonlyWhy)}">只读</span>`;
+    return `<tr class="${editable ? '' : 'row-readonly'}">
       <td class="mono">${escapeHtml(item.code)}</td>
       <td>${escapeHtml(item.name)}</td>
+      <td class="set-cell">${setCell}</td>
       <td><span class="tag ${levelClass(item.level)}">${escapeHtml(item.level)}</span></td>
       <td>${escapeHtml(item.status)}</td>
       <td>${escapeHtml(item.fileType)}</td>
       <td class="mono">${escapeHtml(item.pattern)}</td>
       <td class="note-cell">${escapeHtml(item.note)}</td>
       <td class="mono">${escapeHtml(formatTime(item.updatedAt))}</td>
-      <td class="actions">
-        <button type="button" class="link" data-rule-edit="${escapeHtml(item.id)}">编辑</button>
-        <button type="button" class="link danger" data-rule-delete="${escapeHtml(item.id)}">删除</button>
-      </td>
-    </tr>`).join('');
+      <td class="actions">${actions}</td>
+    </tr>`;
+  }).join('');
   el('rule-empty').classList.toggle('hidden', state.rules.length > 0);
+  renderRuleScope();
+}
+
+// 规则表单里的规则集下拉只列当前操作者负责的集，新建与挪动都不能落到别人管的集里
+function renderRuleSetOptions(selectedId) {
+  const operator = currentOperator();
+  const owned = state.ruleSets.filter((set) => operator && set.owners.includes(operator));
+  const select = el('rule-set');
+  select.innerHTML = owned.map((set) => `<option value="${escapeHtml(set.id)}">${escapeHtml(set.name)}（负责人：${escapeHtml(set.owners.join('、') || '暂无')}）</option>`).join('');
+  if (owned.some((set) => set.id === selectedId)) select.value = selectedId;
 }
 
 function renderFiles() {
@@ -256,6 +312,7 @@ function openRuleForm(rule) {
   el('rule-file-type').value = rule ? rule.fileType : (state.fileTypes[0] || '全部');
   el('rule-pattern').value = rule ? rule.pattern : '';
   el('rule-note').value = rule ? rule.note : '';
+  renderRuleSetOptions(rule ? rule.setId : '');
   el('rule-form').classList.remove('hidden');
   el('rule-code').focus();
 }
@@ -306,6 +363,8 @@ async function submitRule(event) {
     fileType: el('rule-file-type').value,
     pattern: el('rule-pattern').value,
     note: el('rule-note').value,
+    setId: el('rule-set').value,
+    operator: currentOperator(),
   };
   const editing = state.editingRuleId;
   try {
@@ -424,12 +483,14 @@ document.addEventListener('click', async (event) => {
     const found = state.rules.find((item) => item.id === node.dataset.ruleDelete);
     if (!window.confirm(`确定删除规则 ${found ? found.code : ''} 吗？`)) return;
     try {
-      await request(`/api/rules/${encodeURIComponent(node.dataset.ruleDelete)}`, { method: 'DELETE' });
+      const query = new URLSearchParams({ operator: currentOperator() });
+      await request(`/api/rules/${encodeURIComponent(node.dataset.ruleDelete)}?${query}`, { method: 'DELETE' });
       if (state.editingRuleId === node.dataset.ruleDelete) closeRuleForm();
       notify('规则已删除', 'ok');
       await loadRules();
     } catch (err) {
       notify(err.message, 'error');
+      markField(err.field);
     }
     return;
   }
@@ -470,6 +531,16 @@ el('rule-form').addEventListener('submit', submitRule);
 el('file-form').addEventListener('submit', submitFile);
 el('rule-new').addEventListener('click', () => {
   clearNotice();
+  const operator = currentOperator();
+  if (!operator) {
+    notify('先在右上角选一下你是谁，再新建规则', 'error');
+    markField('operator');
+    return;
+  }
+  if (!state.ruleSets.some((set) => set.owners.includes(operator))) {
+    notify(`你不负责任何规则集，新规则没地方归（不归入规则集的规则谁都改不了），不能新建`, 'error');
+    return;
+  }
   openRuleForm(null);
 });
 el('rule-cancel').addEventListener('click', closeRuleForm);
@@ -511,12 +582,16 @@ el('rule-filter-level').addEventListener('change', () => {
 el('rule-filter-status').addEventListener('change', () => {
   loadRules().catch((err) => notify(err.message, 'error'));
 });
+// 切到另一个人：可见与可改的范围跟着变，条数立刻对得上；开着的规则表单先收起来，免得拿旧身份提交
 el('operator').addEventListener('change', () => {
   window.localStorage.setItem(OPERATOR_KEY, currentOperator());
+  clearNotice();
+  clearFieldMarks();
+  closeRuleForm();
+  renderRules();
 });
 
 // 页面打开时先把规则与文件都拉一遍，扫描的范围下拉依赖这两份清单
-restoreOperator();
 loadHealth();
 loadRules()
   .then(loadFiles)

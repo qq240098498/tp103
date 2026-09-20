@@ -48,7 +48,7 @@ app.patch('/api/rules/:id', (req, res) => {
 
 app.delete('/api/rules/:id', (req, res) => {
   try {
-    res.json(api.deleteRule(req.params.id));
+    res.json(api.deleteRule(req.params.id, api.readQuery(req.query, 'operator')));
   } catch (err) {
     sendError(res, err);
   }

@@ -1,4 +1,32 @@
 {
+  "ruleSets": [
+    {
+      "id": "set-3001",
+      "name": "前端代码规范",
+      "owners": [
+        "林岚",
+        "周航"
+      ],
+      "note": "页面与前端脚本的写法"
+    },
+    {
+      "id": "set-3002",
+      "name": "服务端与数据",
+      "owners": [
+        "赵铭"
+      ],
+      "note": "接口、配置与数据库相关"
+    },
+    {
+      "id": "set-3003",
+      "name": "脚本与文档",
+      "owners": [
+        "林岚",
+        "赵铭"
+      ],
+      "note": "部署脚本与文档占位"
+    }
+  ],
   "rules": [
     {
       "id": "rule-1001",
@@ -9,20 +37,9 @@
       "fileType": "js",
       "pattern": "console.log",
       "note": "上线前要换成统一日志",
+      "setId": "set-3001",
       "createdAt": "2026-09-02T02:00:00.000Z",
-      "updatedAt": "2026-09-02T02:00:00.000Z"
-    },
-    {
-      "id": "rule-1002",
-      "code": "CODE-002",
-      "name": "变量声明统一用 let 或 const",
-      "level": "错误",
-      "status": "启用",
-      "fileType": "js",
-      "pattern": "var ",
-      "note": "老代码里还有不少",
-      "createdAt": "2026-09-02T02:00:00.000Z",
-      "updatedAt": "2026-09-02T02:00:00.000Z"
+      "updatedAt": "2026-09-19T14:18:17.365Z"
     },
     {
       "id": "rule-1003",
@@ -33,6 +50,7 @@
       "fileType": "全部",
       "pattern": "TODO",
       "note": "带人名与期限的可以留",
+      "setId": "",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -45,8 +63,9 @@
       "fileType": "全部",
       "pattern": "eval(",
       "note": "",
+      "setId": "set-3002",
       "createdAt": "2026-09-02T02:00:00.000Z",
-      "updatedAt": "2026-09-02T02:00:00.000Z"
+      "updatedAt": "2026-09-19T14:31:23.952Z"
     },
     {
       "id": "rule-1005",
@@ -57,6 +76,7 @@
       "fileType": "全部",
       "pattern": "password =",
       "note": "口令一律走统一配置",
+      "setId": "set-3002",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -69,6 +89,7 @@
       "fileType": "js",
       "pattern": "catch (e) {}",
       "note": "",
+      "setId": "set-3001",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -81,6 +102,7 @@
       "fileType": "js",
       "pattern": "DEBUG = true",
       "note": "等联调结束再打开",
+      "setId": "set-3001",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -93,6 +115,7 @@
       "fileType": "全部",
       "pattern": "postgres://",
       "note": "",
+      "setId": "set-3002",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -105,6 +128,7 @@
       "fileType": "js",
       "pattern": "process.env[",
       "note": "直接按名字取容易拼错",
+      "setId": "set-3001",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -117,6 +141,7 @@
       "fileType": "全部",
       "pattern": "FIXME",
       "note": "",
+      "setId": "",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -129,6 +154,7 @@
       "fileType": "sh",
       "pattern": "rm -rf",
       "note": "脚本里改用受控的清理命令",
+      "setId": "set-3003",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     },
@@ -141,6 +167,7 @@
       "fileType": "md",
       "pattern": "待补",
       "note": "",
+      "setId": "set-3003",
       "createdAt": "2026-09-02T02:00:00.000Z",
       "updatedAt": "2026-09-02T02:00:00.000Z"
     }

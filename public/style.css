@@ -60,8 +60,8 @@ label.operator {
   white-space: nowrap;
 }
 
-label.operator input {
-  width: 150px;
+label.operator select {
+  width: 170px;
 }
 
 .health {
@@ -278,6 +278,39 @@ td.actions {
 .lv-hint {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* 只读的规则：行底色压浅，操作列换成「只读」标记，页面上写得明明白白 */
+.tag.readonly {
+  background: #eef1f4;
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+tr.row-readonly td {
+  background: #fafbfc;
+}
+
+.rule-scope {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.set-cell .set-owners {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.set-none {
+  color: var(--ink-soft);
+}
+
+.form-hint {
+  margin: -4px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
 }
 
 .empty-tip {

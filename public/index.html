@@ -13,8 +13,8 @@
       <p class="subtitle">维护检查规则与纳入检查的文件，按规则扫一遍，把命中记到具体的文件与行上</p>
     </div>
     <div class="topbar-right">
-      <label class="operator" data-field="operator">当前操作者
-        <input id="operator" placeholder="填上你的名字" maxlength="40">
+      <label class="operator" data-field="operator">当前是谁
+        <select id="operator"></select>
       </label>
       <div class="health" id="health">连接中…</div>
     </div>
@@ -37,12 +37,14 @@
           <button type="button" id="rule-new">新建规则</button>
         </div>
       </div>
+      <p class="rule-scope" id="rule-scope"></p>
       <div class="table-wrap">
         <table class="grid">
           <thead>
             <tr>
               <th>编码</th>
               <th>名称</th>
+              <th>规则集</th>
               <th>级别</th>
               <th>状态</th>
               <th>适用文件类型</th>
@@ -75,6 +77,12 @@
           </label>
           <label data-field="pattern">匹配写法<input id="rule-pattern" placeholder="例如 console.log" maxlength="60"></label>
         </div>
+        <div class="form-row">
+          <label data-field="ruleSet">归入规则集
+            <select id="rule-set"></select>
+          </label>
+        </div>
+        <p class="form-hint">只能归到你负责的规则集；没归入规则集的规则谁都改不了，只能看</p>
         <label class="full" data-field="note">说明<input id="rule-note" placeholder="这条规则管什么、为什么这么定" maxlength="200"></label>
         <div class="form-actions">
           <button type="submit">保存</button>

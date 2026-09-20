@@ -5,6 +5,41 @@ const { ApiError, pickText } = require('./errors');
 // 规则编码固定成大写字母加分段的数字，方便在命中清单里引用
 const CODE_PATTERN = /^[A-Z]{2,6}-\d{2,4}$/;
 
+function findSet(data, setId) {
+  return data.ruleSets.find((item) => item.id === setId) || null;
+}
+
+function ownersText(set) {
+  return set.owners.length ? set.owners.join('、') : '暂无';
+}
+
+// 新建或挪动规则时都要有落点：规则集必须存在，没归入规则集的规则谁都改不了
+function validateSetId(value, data) {
+  const setId = pickText(value);
+  if (!setId) {
+    throw new ApiError(400, 'RULE_SET_REQUIRED', '规则要归入一个你负责的规则集，没归入规则集的规则谁都改不了', 'ruleSet');
+  }
+  const set = findSet(data, setId);
+  if (!set) throw new ApiError(404, 'RULE_SET_NOT_FOUND', '选中的规则集不存在', 'ruleSet');
+  return set;
+}
+
+// 当前操作者改不改得动这条规则：规则得挂在某个规则集上，且操作者在负责人名单里。
+// 改动前先把这道关，越权当场拦下并写清原因，不会先改再报错
+function assertRuleEditable(rule, data, operator) {
+  const set = findSet(data, rule.setId);
+  if (!set) {
+    throw new ApiError(403, 'RULE_FORBIDDEN', `规则 ${rule.code} 没有归入任何规则集，谁都改不了，只能看`, 'ruleSet');
+  }
+  if (!operator) {
+    throw new ApiError(403, 'OPERATOR_REQUIRED', '还没选当前是谁：先在页面右上角选好，再动手改规则', 'operator');
+  }
+  if (!set.owners.includes(operator)) {
+    throw new ApiError(403, 'RULE_FORBIDDEN', `规则 ${rule.code} 归规则集「${set.name}」管（负责人：${ownersText(set)}），当前是 ${operator}，不在负责人名单里，不能改`, 'operator');
+  }
+  return set;
+}
+
 function validateCode(value, data, selfId) {
   const code = pickText(value);
   if (!code) throw new ApiError(400, 'CODE_REQUIRED', '请填写规则编码', 'code');
@@ -80,6 +115,16 @@ function sortRules(list) {
   });
 }
 
+// 每条规则带上归属信息：归哪个规则集、负责人是谁，页面据此放开可改或标只读
+function withOwnership(rule, setById) {
+  const set = setById.get(rule.setId) || null;
+  return {
+    ...rule,
+    setName: set ? set.name : '',
+    owners: set ? set.owners.slice() : [],
+  };
+}
+
 // 规则清单：按级别、状态、适用文件类型筛选，再按编码、名称或匹配写法搜索
 function listRules(options) {
   const input = options && typeof options === 'object' ? options : {};
@@ -99,9 +144,19 @@ function listRules(options) {
       || item.pattern.toLowerCase().includes(keyword));
   }
 
+  const setById = new Map(data.ruleSets.map((item) => [item.id, item]));
+  const operators = [];
+  data.ruleSets.forEach((set) => {
+    set.owners.forEach((owner) => {
+      if (!operators.includes(owner)) operators.push(owner);
+    });
+  });
+
   const usedFileTypes = Array.from(new Set(data.rules.map((item) => item.fileType)));
   return {
-    rules: sortRules(list),
+    rules: sortRules(list).map((item) => withOwnership(item, setById)),
+    ruleSets: data.ruleSets,
+    operators,
     levels: LEVELS.slice(),
     statuses: STATUSES.slice(),
     fileTypes: FILE_TYPES.slice(),
@@ -113,12 +168,21 @@ function getRule(id) {
   const data = load();
   const found = data.rules.find((item) => item.id === id);
   if (!found) throw new ApiError(404, 'RULE_NOT_FOUND', '这条规则不存在或已被删除', '');
-  return found;
+  const setById = new Map(data.ruleSets.map((item) => [item.id, item]));
+  return withOwnership(found, setById);
 }
 
 function createRule(payload) {
   const input = payload && typeof payload === 'object' ? payload : {};
   const data = load();
+  const operator = pickText(input.operator);
+  if (!operator) {
+    throw new ApiError(403, 'OPERATOR_REQUIRED', '还没选当前是谁：先在页面右上角选好，再新建规则', 'operator');
+  }
+  const set = validateSetId(input.setId, data);
+  if (!set.owners.includes(operator)) {
+    throw new ApiError(403, 'RULE_FORBIDDEN', `规则集「${set.name}」的负责人是 ${ownersText(set)}，当前是 ${operator}，不在负责人名单里，不能往里加规则`, 'operator');
+  }
   const now = new Date().toISOString();
   const created = {
     id: crypto.randomUUID(),
@@ -129,12 +193,14 @@ function createRule(payload) {
     fileType: validateFileType(input.fileType),
     pattern: validatePattern(input.pattern),
     note: validateNote(input.note),
+    setId: set.id,
     createdAt: now,
     updatedAt: now,
   };
   data.rules.push(created);
   save(data);
-  return created;
+  const setById = new Map(data.ruleSets.map((item) => [item.id, item]));
+  return withOwnership(created, setById);
 }
 
 function updateRule(id, payload) {
@@ -142,6 +208,18 @@ function updateRule(id, payload) {
   const data = load();
   const found = data.rules.find((item) => item.id === id);
   if (!found) throw new ApiError(404, 'RULE_NOT_FOUND', '这条规则不存在或已被删除', '');
+
+  const operator = pickText(input.operator);
+  assertRuleEditable(found, data, operator);
+
+  // 挪到别的规则集时，目标集也必须是当前操作者管的，不能把规则塞进别人管的集里
+  if (input.setId !== undefined && pickText(input.setId) !== found.setId) {
+    const target = validateSetId(input.setId, data);
+    if (!target.owners.includes(operator)) {
+      throw new ApiError(403, 'RULE_FORBIDDEN', `不能把规则挪进规则集「${target.name}」：负责人是 ${ownersText(target)}，当前是 ${operator}，不在负责人名单里`, 'ruleSet');
+    }
+    found.setId = target.id;
+  }
 
   found.code = input.code === undefined ? found.code : validateCode(input.code, data, found.id);
   found.name = input.name === undefined ? found.name : validateName(input.name);
@@ -152,13 +230,15 @@ function updateRule(id, payload) {
   found.note = input.note === undefined ? found.note : validateNote(input.note);
   found.updatedAt = new Date().toISOString();
   save(data);
-  return found;
+  const setById = new Map(data.ruleSets.map((item) => [item.id, item]));
+  return withOwnership(found, setById);
 }
 
-function deleteRule(id) {
+function deleteRule(id, operator) {
   const data = load();
   const index = data.rules.findIndex((item) => item.id === id);
   if (index === -1) throw new ApiError(404, 'RULE_NOT_FOUND', '这条规则不存在或已被删除', '');
+  assertRuleEditable(data.rules[index], data, pickText(operator));
   const [removed] = data.rules.splice(index, 1);
   save(data);
   return { id: removed.id, code: removed.code, name: removed.name };
